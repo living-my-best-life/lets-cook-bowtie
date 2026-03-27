@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARR Forecast Dashboard — Baseline vs. Upside</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
+    <style>
+        :root {
+            --bg-primary: #0f1117;
+            --bg-card: #1a1d27;
+            --bg-header: #12141c;
+            --text-primary: #e8eaed;
+            --text-secondary: #8b8fa3;
+            --text-on-dark: #ffffff;
+            --accent-blue: #4C8BF5;
+            --accent-green: #34D399;
+            --accent-orange: #F59E0B;
+            --accent-purple: #A78BFA;
+            --accent-red: #EF4444;
+            --positive: #34D399;
+            --negative: #EF4444;
+            --border: rgba(255,255,255,0.06);
+            --gap: 16px;
+            --radius: 12px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        /* Header */
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 28px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .header-left h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-on-dark);
+            margin-bottom: 4px;
+        }
+
+        .header-left .subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .scenario-toggle {
+            display: flex;
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 3px;
+            border: 1px solid var(--border);
+        }
+
+        .scenario-toggle button {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: transparent;
+            color: var(--text-secondary);
+        }
+
+        .scenario-toggle button.active {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .scenario-toggle button:hover:not(.active) {
+            color: var(--text-primary);
+        }
+
+        /* KPI Row */
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: var(--gap);
+            margin-bottom: 24px;
+        }
+
+        .kpi-card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 20px 24px;
+            border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+        }
+
+        .kpi-card.blue::before { background: var(--accent-blue); }
+        .kpi-card.green::before { background: var(--accent-green); }
+        .kpi-card.orange::before { background: var(--accent-orange); }
+        .kpi-card.purple::before { background: var(--accent-purple); }
+
+        .kpi-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .kpi-value {
+            font-size: 30px;
+            font-weight: 700;
+            color: var(--text-on-dark);
+            margin-bottom: 4px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .kpi-change {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .kpi-change.positive { color: var(--positive); }
+        .kpi-change.negative { color: var(--negative); }
+        .kpi-change.neutral { color: var(--text-secondary); }
+
+        /* Chart Section */
+        .chart-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: var(--gap);
+            margin-bottom: 24px;
+        }
+
+        .chart-card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 24px;
+            border: 1px solid var(--border);
+        }
+
+        .chart-card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 20px;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 320px;
+        }
+
+        .chart-wrapper-sm {
+            position: relative;
+            height: 320px;
+        }
+
+        /* Full-width chart row */
+        .chart-full {
+            margin-bottom: 24px;
+        }
+
+        /* Data Table */
+        .table-card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 24px;
+            border: 1px solid var(--border);
+            overflow-x: auto;
+            margin-bottom: 24px;
+        }
+
+        .table-card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .data-table thead th {
+            text-align: left;
+            padding: 10px 14px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+        }
+
+        .data-table tbody td {
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .data-table tbody tr:hover {
+            background: rgba(255,255,255,0.02);
+        }
+
+        .data-table .highlight {
+            color: var(--accent-green);
+            font-weight: 600;
+        }
+
+        .data-table .upside-row {
+            background: rgba(52, 211, 153, 0.05);
+        }
+
+        .data-table .upside-row td {
+            color: var(--accent-green);
+            font-weight: 500;
+        }
+
+        /* Upside Accounts Detail */
+        .upside-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--gap);
+            margin-bottom: 24px;
+        }
+
+        .account-card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 20px;
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent-green);
+        }
+
+        .account-name {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-on-dark);
+            margin-bottom: 12px;
+        }
+
+        .account-stat {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+
+        .account-stat .label {
+            color: var(--text-secondary);
+        }
+
+        .account-stat .value {
+            color: var(--text-primary);
+            font-weight: 500;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Footer */
+        .dashboard-footer {
+            text-align: center;
+            padding: 16px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-base {
+            background: rgba(76, 139, 245, 0.15);
+            color: var(--accent-blue);
+        }
+
+        .badge-upside {
+            background: rgba(52, 211, 153, 0.15);
+            color: var(--accent-green);
+        }
+
+        /* Annotations */
+        .callout {
+            background: rgba(245, 158, 11, 0.08);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            border-radius: 8px;
+            padding: 14px 18px;
+            margin-bottom: 24px;
+            font-size: 13px;
+            color: var(--accent-orange);
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .callout-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+        @media (max-width: 768px) {
+            .chart-grid { grid-template-columns: 1fr; }
+            .kpi-row { grid-template-columns: repeat(2, 1fr); }
+            .upside-grid { grid-template-columns: 1fr 1fr; }
+            .dashboard-header { flex-direction: column; }
+        }
+
+        @media print {
+            body { background: white; color: #212529; }
+            .kpi-card, .chart-card, .table-card, .account-card { border: 1px solid #dee2e6; background: white; }
+            .dashboard-container { max-width: none; }
+        }
+    </style>
+</head>
+<body>
+<div class="dashboard-container">
+
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div class="header-left">
+            <h1>Quarterly ARR Forecast</h1>
+            <div class="subtitle">FY2026 — Base Forecast + Q2 Upside Layer</div>
+        </div>
+        <div class="scenario-toggle">
+            <button class="active" id="btn-both" onclick="setView('both')">Both</button>
+            <button id="btn-base" onclick="setView('base')">Baseline</button>
+            <button id="btn-upside" onclick="setView('upside')">With Upside</button>
+        </div>
+    </div>
+
+    <!-- Callout -->
+    <div class="callout">
+        <span class="callout-icon">&#9888;</span>
+        <span><strong>Finance Note:</strong> Upside layer shows gross ARR assuming full realization. Does not yet adjust for timing/ramp, partial deployment, or churn offsets. Classify as "high-confidence upside case."</span>
+    </div>
+
+    <!-- KPI Row -->
+    <section class="kpi-row">
+        <div class="kpi-card blue">
+            <div class="kpi-label">Q1 Actual ARR</div>
+            <div class="kpi-value">$11.07M</div>
+            <div class="kpi-change neutral">Closed — Actual</div>
+        </div>
+        <div class="kpi-card green" id="kpi-q4-card">
+            <div class="kpi-label" id="kpi-q4-label">Year-End ARR (Upside)</div>
+            <div class="kpi-value" id="kpi-q4-value">$14.46M</div>
+            <div class="kpi-change positive" id="kpi-q4-change">+$1.06M vs. Base</div>
+        </div>
+        <div class="kpi-card orange">
+            <div class="kpi-label">Q2 Upside Layer</div>
+            <div class="kpi-value">$1.04M</div>
+            <div class="kpi-change positive">4 new accounts</div>
+        </div>
+        <div class="kpi-card purple">
+            <div class="kpi-label">Care Agent % of ARR (Q4)</div>
+            <div class="kpi-value" id="kpi-ca-pct">20.8%</div>
+            <div class="kpi-change positive" id="kpi-ca-pct-change">Dominant growth driver</div>
+        </div>
+    </section>
+
+    <!-- Main Chart: Total ARR Trendlines -->
+    <div class="chart-card chart-full">
+        <h3>Total ARR by Quarter — <span class="badge badge-base">Baseline</span> vs. <span class="badge badge-upside">With Upside</span></h3>
+        <div class="chart-wrapper">
+            <canvas id="arrTrendChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Chart Grid: Segment Breakdown + Composition -->
+    <div class="chart-grid">
+        <div class="chart-card">
+            <h3>ARR by Segment — Stacked View</h3>
+            <div class="chart-wrapper">
+                <canvas id="segmentStackChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>Q4 ARR Composition</h3>
+            <div class="chart-wrapper-sm">
+                <canvas id="compositionChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upside Account Cards -->
+    <div class="table-card">
+        <h3>Q2 Upside Accounts</h3>
+    </div>
+    <div class="upside-grid">
+        <div class="account-card">
+            <div class="account-name">AFC</div>
+            <div class="account-stat"><span class="label">Clinics</span><span class="value">415</span></div>
+            <div class="account-stat"><span class="label">MRR</span><span class="value">$14,525</span></div>
+            <div class="account-stat"><span class="label">ARR</span><span class="value highlight">$174,300</span></div>
+        </div>
+        <div class="account-card">
+            <div class="account-name">HCA</div>
+            <div class="account-stat"><span class="label">Clinics</span><span class="value">355</span></div>
+            <div class="account-stat"><span class="label">MRR</span><span class="value">$12,425</span></div>
+            <div class="account-stat"><span class="label">ARR</span><span class="value highlight">$149,100</span></div>
+        </div>
+        <div class="account-card">
+            <div class="account-name">Fast Pace</div>
+            <div class="account-stat"><span class="label">Clinics</span><span class="value">333</span></div>
+            <div class="account-stat"><span class="label">MRR</span><span class="value">$11,655</span></div>
+            <div class="account-stat"><span class="label">ARR</span><span class="value highlight">$139,860</span></div>
+        </div>
+        <div class="account-card">
+            <div class="account-name">Urgent Team</div>
+            <div class="account-stat"><span class="label">Clinics</span><span class="value">94</span></div>
+            <div class="account-stat"><span class="label">MRR</span><span class="value">$47,940</span></div>
+            <div class="account-stat"><span class="label">ARR</span><span class="value highlight">$575,280</span></div>
+        </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-card">
+        <h3>Quarterly Detail</h3>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Quarter</th>
+                    <th>PE ARR</th>
+                    <th>Care Agent ARR (Base)</th>
+                    <th>Care Agent Upside</th>
+                    <th>Total ARR (Base)</th>
+                    <th>Total ARR (Upside)</th>
+                    <th>Delta</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Q1 (Actual)</strong></td>
+                    <td>$10.50M</td>
+                    <td>$0.57M</td>
+                    <td>—</td>
+                    <td>$11.07M</td>
+                    <td>$11.07M</td>
+                    <td class="neutral">—</td>
+                </tr>
+                <tr>
+                    <td><strong>Q2</strong></td>
+                    <td>$10.77M</td>
+                    <td>$0.96M</td>
+                    <td class="highlight">$1.04M</td>
+                    <td>$11.73M</td>
+                    <td class="highlight">$12.77M</td>
+                    <td class="highlight">+$1.04M</td>
+                </tr>
+                <tr>
+                    <td><strong>Q3</strong></td>
+                    <td>$11.10M</td>
+                    <td>$1.50M</td>
+                    <td class="highlight">$1.04M</td>
+                    <td>$12.60M</td>
+                    <td class="highlight">$13.64M</td>
+                    <td class="highlight">+$1.04M</td>
+                </tr>
+                <tr>
+                    <td><strong>Q4</strong></td>
+                    <td>$11.45M</td>
+                    <td>$1.97M</td>
+                    <td class="highlight">$1.04M</td>
+                    <td>$13.42M</td>
+                    <td class="highlight">$14.46M</td>
+                    <td class="highlight">+$1.04M</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Footer -->
+    <div class="dashboard-footer">
+        Data as of March 2026 &middot; Upside layer = gross ARR, full realization &middot; High-confidence upside case
+    </div>
+</div>
+
+<script>
+    // ── DATA ──
+    const QUARTERS = ['Q1 (Actual)', 'Q2', 'Q3', 'Q4'];
+
+    const BASE = {
+        pe:        [10.50, 10.77, 11.10, 11.45],
+        careAgent: [0.57,  0.96,  1.50,  1.97],
+        total:     [11.07, 11.73, 12.60, 13.42]
+    };
+
+    const UPSIDE_LAYER = [0, 1.04, 1.04, 1.04];
+
+    const UPSIDE = {
+        pe:        [10.50, 10.77, 11.10, 11.45],
+        careAgent: [0.57,  2.00,  2.54,  3.01],
+        total:     [11.07, 12.77, 13.64, 14.46]
+    };
+
+    // ── COLORS ──
+    const COLORS = {
+        blue:       '#4C8BF5',
+        green:      '#34D399',
+        orange:     '#F59E0B',
+        purple:     '#A78BFA',
+        blueFaded:  'rgba(76, 139, 245, 0.15)',
+        greenFaded: 'rgba(52, 211, 153, 0.15)',
+    };
+
+    // ── FORMAT ──
+    function fmt(val) {
+        return '$' + val.toFixed(2) + 'M';
+    }
+
+    // ── CHART 1: Total ARR Trendlines ──
+    const ctx1 = document.getElementById('arrTrendChart').getContext('2d');
+    const arrTrendChart = new Chart(ctx1, {
+        type: 'line',
+        data: {
+            labels: QUARTERS,
+            datasets: [
+                {
+                    label: 'Baseline Total ARR',
+                    data: BASE.total,
+                    borderColor: COLORS.blue,
+                    backgroundColor: COLORS.blueFaded,
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 6,
+                    pointHoverRadius: 9,
+                    pointBackgroundColor: COLORS.blue,
+                    pointBorderColor: '#1a1d27',
+                    pointBorderWidth: 2,
+                },
+                {
+                    label: 'With Upside Total ARR',
+                    data: UPSIDE.total,
+                    borderColor: COLORS.green,
+                    backgroundColor: COLORS.greenFaded,
+                    borderWidth: 3,
+                    borderDash: [6, 3],
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 6,
+                    pointHoverRadius: 9,
+                    pointBackgroundColor: COLORS.green,
+                    pointBorderColor: '#1a1d27',
+                    pointBorderWidth: 2,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 20,
+                        color: '#8b8fa3',
+                        font: { size: 12 }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#1a1d27',
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    titleColor: '#e8eaed',
+                    bodyColor: '#e8eaed',
+                    padding: 12,
+                    callbacks: {
+                        label: ctx => `${ctx.dataset.label}: ${fmt(ctx.parsed.y)}`
+                    }
+                },
+                annotation: undefined
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#8b8fa3', font: { size: 12 } }
+                },
+                y: {
+                    min: 10,
+                    max: 16,
+                    grid: { color: 'rgba(255,255,255,0.04)' },
+                    ticks: {
+                        color: '#8b8fa3',
+                        font: { size: 12 },
+                        callback: v => '$' + v.toFixed(0) + 'M'
+                    }
+                }
+            }
+        }
+    });
+
+    // ── CHART 2: Stacked Segment Bars ──
+    const ctx2 = document.getElementById('segmentStackChart').getContext('2d');
+    const segmentStackChart = new Chart(ctx2, {
+        type: 'bar',
+        data: {
+            labels: QUARTERS,
+            datasets: [
+                {
+                    label: 'PE ARR',
+                    data: BASE.pe,
+                    backgroundColor: COLORS.blue,
+                    borderRadius: 2,
+                },
+                {
+                    label: 'Care Agent ARR (Base)',
+                    data: BASE.careAgent,
+                    backgroundColor: COLORS.purple,
+                    borderRadius: 2,
+                },
+                {
+                    label: 'Care Agent Upside',
+                    data: UPSIDE_LAYER,
+                    backgroundColor: COLORS.green,
+                    borderRadius: 2,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 16,
+                        color: '#8b8fa3',
+                        font: { size: 11 }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#1a1d27',
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    titleColor: '#e8eaed',
+                    bodyColor: '#e8eaed',
+                    padding: 12,
+                    callbacks: {
+                        label: ctx => `${ctx.dataset.label}: ${fmt(ctx.parsed.y)}`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    grid: { display: false },
+                    ticks: { color: '#8b8fa3', font: { size: 12 } }
+                },
+                y: {
+                    stacked: true,
+                    grid: { color: 'rgba(255,255,255,0.04)' },
+                    ticks: {
+                        color: '#8b8fa3',
+                        font: { size: 12 },
+                        callback: v => '$' + v.toFixed(0) + 'M'
+                    }
+                }
+            }
+        }
+    });
+
+    // ── CHART 3: Q4 Composition Doughnut ──
+    const ctx3 = document.getElementById('compositionChart').getContext('2d');
+    const compositionChart = new Chart(ctx3, {
+        type: 'doughnut',
+        data: {
+            labels: ['PE ARR', 'Care Agent (Base)', 'Care Agent (Upside)'],
+            datasets: [{
+                data: [11.45, 1.97, 1.04],
+                backgroundColor: [COLORS.blue, COLORS.purple, COLORS.green],
+                borderColor: '#1a1d27',
+                borderWidth: 3,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '62%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 14,
+                        color: '#8b8fa3',
+                        font: { size: 11 }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#1a1d27',
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    titleColor: '#e8eaed',
+                    bodyColor: '#e8eaed',
+                    padding: 12,
+                    callbacks: {
+                        label: ctx => {
+                            const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                            const pct = ((ctx.parsed / total) * 100).toFixed(1);
+                            return `${ctx.label}: ${fmt(ctx.parsed)} (${pct}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // ── VIEW TOGGLE ──
+    let currentView = 'both';
+
+    function setView(view) {
+        currentView = view;
+
+        // Toggle buttons
+        document.querySelectorAll('.scenario-toggle button').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-' + view).classList.add('active');
+
+        // Update trend chart
+        if (view === 'base') {
+            arrTrendChart.data.datasets[0].hidden = false;
+            arrTrendChart.data.datasets[1].hidden = true;
+        } else if (view === 'upside') {
+            arrTrendChart.data.datasets[0].hidden = true;
+            arrTrendChart.data.datasets[1].hidden = false;
+        } else {
+            arrTrendChart.data.datasets[0].hidden = false;
+            arrTrendChart.data.datasets[1].hidden = false;
+        }
+        arrTrendChart.update('none');
+
+        // Update stacked chart upside layer visibility
+        if (view === 'base') {
+            segmentStackChart.data.datasets[2].hidden = true;
+        } else {
+            segmentStackChart.data.datasets[2].hidden = false;
+        }
+        segmentStackChart.update('none');
+
+        // Update doughnut
+        if (view === 'base') {
+            compositionChart.data.datasets[0].data = [11.45, 1.97, 0];
+            compositionChart.data.labels = ['PE ARR', 'Care Agent (Base)', ''];
+        } else {
+            compositionChart.data.datasets[0].data = [11.45, 1.97, 1.04];
+            compositionChart.data.labels = ['PE ARR', 'Care Agent (Base)', 'Care Agent (Upside)'];
+        }
+        compositionChart.update('none');
+
+        // Update KPIs
+        const kpiLabel = document.getElementById('kpi-q4-label');
+        const kpiValue = document.getElementById('kpi-q4-value');
+        const kpiChange = document.getElementById('kpi-q4-change');
+        const kpiCaPct = document.getElementById('kpi-ca-pct');
+        const kpiCaPctChange = document.getElementById('kpi-ca-pct-change');
+
+        if (view === 'base') {
+            kpiLabel.textContent = 'Year-End ARR (Base)';
+            kpiValue.textContent = '$13.42M';
+            kpiChange.textContent = '+21.2% YoY growth';
+            kpiChange.className = 'kpi-change positive';
+            kpiCaPct.textContent = '14.7%';
+            kpiCaPctChange.textContent = 'Growing segment';
+        } else {
+            kpiLabel.textContent = 'Year-End ARR (Upside)';
+            kpiValue.textContent = '$14.46M';
+            kpiChange.textContent = '+$1.04M vs. Base';
+            kpiChange.className = 'kpi-change positive';
+            kpiCaPct.textContent = '20.8%';
+            kpiCaPctChange.textContent = 'Dominant growth driver';
+        }
+    }
+</script>
+</body>
+</html>
